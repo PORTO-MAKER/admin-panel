@@ -1,18 +1,15 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import {
     FiEdit,
     FiTrash2,
     FiPlus,
     FiChevronLeft,
     FiChevronRight,
+    FiSearch,
 } from "react-icons/fi";
-
-// Definisikan header di satu tempat agar mudah digunakan kembali
-const apiHeaders = {
-    "X-secret-code": process.env.NEXT_PUBLIC_API_SECRET_KEY,
-};
+import { useDebounce } from "../utils/debounce"; // Impor hook dari file terpisah
 
 export default function SkillsPage() {
     const [skills, setSkills] = useState([]);
@@ -26,36 +23,51 @@ export default function SkillsPage() {
         darkImage: null,
     });
 
+    // State untuk Pagination dan Filter
     const [pagination, setPagination] = useState({
         currentPage: 1,
         totalPages: 1,
         totalSkills: 0,
     });
     const [currentPage, setCurrentPage] = useState(1);
-    const itemsPerPage = 5;
+    const [searchQuery, setSearchQuery] = useState("");
+    const itemsPerPage = 10;
+
+    const debouncedSearchQuery = useDebounce(searchQuery, 300);
+
+    const fetchSkills = useCallback(
+        async (page, search) => {
+            try {
+                const res = await fetch(
+                    `/api/skills?page=${page}&limit=${itemsPerPage}&name=${search}`,
+                    {
+                        headers: {
+                            "X-secret-code":
+                                process.env.NEXT_PUBLIC_API_SECRET_KEY,
+                        },
+                    }
+                );
+                if (!res.ok) throw new Error("Gagal mengambil data skills");
+
+                const { data, pagination: paginationData } = await res.json();
+                setSkills(data);
+                setPagination(paginationData);
+            } catch (error) {
+                console.error(error);
+            }
+        },
+        [itemsPerPage]
+    );
 
     useEffect(() => {
-        fetchSkills(currentPage);
-    }, [currentPage]);
+        fetchSkills(currentPage, debouncedSearchQuery);
+    }, [currentPage, debouncedSearchQuery, fetchSkills]);
 
-    const fetchSkills = async (page) => {
-        try {
-            const res = await fetch(
-                `/api/skills?page=${page}&limit=${itemsPerPage}`,
-                {
-                    headers: apiHeaders, // Tambahkan header di sini
-                }
-            );
-            if (!res.ok) throw new Error("Gagal mengambil data skills");
-
-            const { data, pagination: paginationData } = await res.json();
-            setSkills(data);
-            setPagination(paginationData);
-        } catch (error) {
-            console.error(error);
-            // Anda bisa menambahkan notifikasi error di sini
+    useEffect(() => {
+        if (currentPage !== 1) {
+            setCurrentPage(1);
         }
-    };
+    }, [debouncedSearchQuery]);
 
     const paginate = (pageNumber) => {
         if (pageNumber < 1 || pageNumber > pagination.totalPages) return;
@@ -86,17 +98,11 @@ export default function SkillsPage() {
                 method,
                 body: data,
                 headers: {
-                    // Jangan gunakan 'Content-Type' saat mengirim FormData
                     "X-secret-code": process.env.NEXT_PUBLIC_API_SECRET_KEY,
                 },
             });
-
             if (res.ok) {
-                if (!currentSkill && pagination.totalPages > currentPage) {
-                    setCurrentPage(pagination.totalPages + 1);
-                } else {
-                    fetchSkills(currentPage);
-                }
+                fetchSkills(currentPage, debouncedSearchQuery);
                 closeModal();
             } else {
                 const result = await res.json();
@@ -129,13 +135,15 @@ export default function SkillsPage() {
             try {
                 const res = await fetch(`/api/skills/${id}`, {
                     method: "DELETE",
-                    headers: apiHeaders, // Tambahkan header di sini
+                    headers: {
+                        "X-secret-code": process.env.NEXT_PUBLIC_API_SECRET_KEY,
+                    },
                 });
                 if (res.ok) {
                     if (skills.length === 1 && currentPage > 1) {
                         setCurrentPage(currentPage - 1);
                     } else {
-                        fetchSkills(currentPage);
+                        fetchSkills(currentPage, debouncedSearchQuery);
                     }
                 } else {
                     const result = await res.json();
@@ -151,14 +159,28 @@ export default function SkillsPage() {
 
     return (
         <div className="container mx-auto p-4 md:p-8">
-            <div className="flex justify-between items-center mb-6">
+            <div className="flex flex-col md:flex-row justify-between items-center mb-6 gap-4">
                 <h1 className="text-3xl font-bold">Manage Skills</h1>
-                <button
-                    onClick={() => openModal()}
-                    className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg flex items-center transition-colors"
-                >
-                    <FiPlus className="mr-2" /> Tambah Skill
-                </button>
+                <div className="flex items-center gap-4 w-full md:w-auto">
+                    <div className="relative w-full md:w-64">
+                        <span className="absolute inset-y-0 left-0 flex items-center pl-3">
+                            <FiSearch className="text-gray-400" />
+                        </span>
+                        <input
+                            type="text"
+                            placeholder="Cari nama skill..."
+                            value={searchQuery}
+                            onChange={(e) => setSearchQuery(e.target.value)}
+                            className="w-full pl-10 pr-4 py-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        />
+                    </div>
+                    <button
+                        onClick={() => openModal()}
+                        className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg flex items-center transition-colors flex-shrink-0"
+                    >
+                        <FiPlus className="mr-2" /> Tambah
+                    </button>
+                </div>
             </div>
 
             <div className="bg-white dark:bg-gray-800 shadow-md rounded-lg overflow-hidden">
@@ -172,48 +194,61 @@ export default function SkillsPage() {
                         </tr>
                     </thead>
                     <tbody>
-                        {skills.map((skill) => (
-                            <tr
-                                key={skill._id}
-                                className="border-b border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600"
-                            >
-                                <td className="px-5 py-4 text-sm">
-                                    <p className="text-gray-900 dark:text-white whitespace-no-wrap">
-                                        {skill.name}
-                                    </p>
-                                </td>
-                                <td className="px-5 py-4 text-sm">
-                                    <img
-                                        src={skill.lightColorPath}
-                                        alt={`${skill.name} Light`}
-                                        className="w-10 h-10"
-                                    />
-                                </td>
-                                <td className="px-5 py-4 text-sm">
-                                    <div className="bg-gray-800 dark:bg-gray-900 p-1 rounded-md inline-block">
+                        {skills.length > 0 ? (
+                            skills.map((skill) => (
+                                <tr
+                                    key={skill._id}
+                                    className="border-b border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600"
+                                >
+                                    <td className="px-5 py-4 text-sm">
+                                        <p className="text-gray-900 dark:text-white whitespace-no-wrap">
+                                            {skill.name}
+                                        </p>
+                                    </td>
+                                    <td className="px-5 py-4 text-sm">
                                         <img
-                                            src={skill.darkColorPath}
-                                            alt={`${skill.name} Dark`}
+                                            src={skill.lightColorPath}
+                                            alt={`${skill.name} Light`}
                                             className="w-10 h-10"
                                         />
-                                    </div>
-                                </td>
-                                <td className="px-5 py-4 text-sm text-right">
-                                    <button
-                                        onClick={() => openModal(skill)}
-                                        className="text-yellow-500 hover:text-yellow-700 mr-4"
-                                    >
-                                        <FiEdit size={20} />
-                                    </button>
-                                    <button
-                                        onClick={() => handleDelete(skill._id)}
-                                        className="text-red-500 hover:text-red-700"
-                                    >
-                                        <FiTrash2 size={20} />
-                                    </button>
+                                    </td>
+                                    <td className="px-5 py-4 text-sm">
+                                        <div className="bg-gray-800 dark:bg-gray-900 p-1 rounded-md inline-block">
+                                            <img
+                                                src={skill.darkColorPath}
+                                                alt={`${skill.name} Dark`}
+                                                className="w-10 h-10"
+                                            />
+                                        </div>
+                                    </td>
+                                    <td className="px-5 py-4 text-sm text-right">
+                                        <button
+                                            onClick={() => openModal(skill)}
+                                            className="text-yellow-500 hover:text-yellow-700 mr-4"
+                                        >
+                                            <FiEdit size={20} />
+                                        </button>
+                                        <button
+                                            onClick={() =>
+                                                handleDelete(skill._id)
+                                            }
+                                            className="text-red-500 hover:text-red-700"
+                                        >
+                                            <FiTrash2 size={20} />
+                                        </button>
+                                    </td>
+                                </tr>
+                            ))
+                        ) : (
+                            <tr>
+                                <td
+                                    colSpan="4"
+                                    className="text-center py-10 text-gray-500"
+                                >
+                                    No skills found.
                                 </td>
                             </tr>
-                        ))}
+                        )}
                     </tbody>
                 </table>
             </div>

@@ -6,18 +6,23 @@ import minioClient from "../../../lib/minio";
 export async function GET(request) {
     await dbConnect();
 
-    // Ambil query parameter dari URL
     const { searchParams } = new URL(request.url);
     const page = parseInt(searchParams.get("page")) || 1;
-    const limit = parseInt(searchParams.get("limit")) || 5; // Default 5 item per halaman
+    const limit = parseInt(searchParams.get("limit")) || 10; // Ubah default limit menjadi 10
+    const searchQuery = searchParams.get("name") || "";
     const skip = (page - 1) * limit;
 
-    try {
-        // Hitung total dokumen untuk paginasi
-        const totalSkills = await Skill.countDocuments();
+    // Buat query filter untuk pencarian
+    const filter = searchQuery
+        ? { name: { $regex: searchQuery, $options: "i" } } // 'i' untuk case-insensitive
+        : {};
 
-        // Ambil data sesuai halaman dan limit, lalu urutkan berdasarkan nama
-        const skills = await Skill.find({})
+    try {
+        // Hitung total dokumen berdasarkan filter
+        const totalSkills = await Skill.countDocuments(filter);
+
+        // Ambil data dengan filter, sort, skip, dan limit
+        const skills = await Skill.find(filter)
             .sort({ name: 1 })
             .skip(skip)
             .limit(limit)
@@ -32,7 +37,6 @@ export async function GET(request) {
             };
         });
 
-        // Kembalikan data beserta metadata paginasi
         return NextResponse.json({
             success: true,
             data: skillsWithUrls,
