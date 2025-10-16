@@ -9,7 +9,7 @@ import {
     FiChevronRight,
     FiSearch,
 } from "react-icons/fi";
-import { useDebounce } from "../utils/debounce"; // Impor hook dari file terpisah
+import { useDebounce } from "../utils/debounce";
 
 export default function SkillsPage() {
     const [skills, setSkills] = useState([]);
@@ -17,13 +17,10 @@ export default function SkillsPage() {
     const [currentSkill, setCurrentSkill] = useState(null);
     const [formData, setFormData] = useState({
         name: "",
-        lightImageName: "",
-        darkImageName: "",
         lightImage: null,
         darkImage: null,
     });
 
-    // State untuk Pagination dan Filter
     const [pagination, setPagination] = useState({
         currentPage: 1,
         totalPages: 1,
@@ -83,8 +80,6 @@ export default function SkillsPage() {
         e.preventDefault();
         const data = new FormData();
         data.append("name", formData.name);
-        data.append("lightImageName", formData.lightImageName);
-        data.append("darkImageName", formData.darkImageName);
         if (formData.lightImage) data.append("lightImage", formData.lightImage);
         if (formData.darkImage) data.append("darkImage", formData.darkImage);
 
@@ -117,8 +112,6 @@ export default function SkillsPage() {
         setCurrentSkill(skill);
         setFormData({
             name: skill ? skill.name : "",
-            lightImageName: skill ? skill.lightColorPath.split("/").pop() : "",
-            darkImageName: skill ? skill.darkColorPath.split("/").pop() : "",
             lightImage: null,
             darkImage: null,
         });
@@ -158,33 +151,35 @@ export default function SkillsPage() {
     const firstItemNumber = (pagination.currentPage - 1) * itemsPerPage + 1;
 
     return (
-        <div className="container mx-auto p-4 md:p-8">
+        <div className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8 py-6">
             <div className="flex flex-col md:flex-row justify-between items-center mb-6 gap-4">
-                <h1 className="text-3xl font-bold">Manage Skills</h1>
+                <h1 className="text-3xl md:text-4xl font-semibold tracking-tight text-gray-900 dark:text-white">
+                    Manage Skills
+                </h1>
                 <div className="flex items-center gap-4 w-full md:w-auto">
-                    <div className="relative w-full md:w-64">
-                        <span className="absolute inset-y-0 left-0 flex items-center pl-3">
-                            <FiSearch className="text-gray-400" />
+                    <div className="relative w-full md:w-72 group">
+                        <span className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
+                            <FiSearch className="h-5 w-5 text-gray-400 group-focus-within:text-blue-600 transition-colors" />
                         </span>
                         <input
                             type="text"
                             placeholder="Cari nama skill..."
                             value={searchQuery}
                             onChange={(e) => setSearchQuery(e.target.value)}
-                            className="w-full pl-10 pr-4 py-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 placeholder:text-gray-400 focus:outline-none focus:ring-4 focus:ring-blue-500/20 focus:border-blue-500 transition"
                         />
                     </div>
                     <button
                         onClick={() => openModal()}
-                        className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg flex items-center transition-colors flex-shrink-0"
+                        className="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-medium px-4 py-2.5 rounded-xl shadow-sm focus:outline-none focus:ring-4 focus:ring-blue-500/20 active:scale-[0.99] transition flex-shrink-0"
                     >
-                        <FiPlus className="mr-2" /> Tambah
+                        <FiPlus className="h-5 w-5" /> Tambah
                     </button>
                 </div>
             </div>
 
-            <div className="bg-white dark:bg-gray-800 shadow-md rounded-lg overflow-hidden">
-                <table className="min-w-full leading-normal">
+            <div className="bg-white dark:bg-gray-900 shadow-sm ring-1 ring-gray-200 dark:ring-gray-800 rounded-2xl overflow-hidden">
+                <table className="min-w-full leading-normal text-sm">
                     <thead>
                         <tr className="border-b-2 border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-700 text-left text-xs font-semibold text-gray-600 dark:text-gray-300 uppercase tracking-wider">
                             <th className="px-5 py-3">Skill Name</th>
@@ -198,43 +193,43 @@ export default function SkillsPage() {
                             skills.map((skill) => (
                                 <tr
                                     key={skill._id}
-                                    className="border-b border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600"
+                                    className="border-b border-gray-200 dark:border-gray-800 odd:bg-white even:bg-gray-50 dark:odd:bg-gray-900 dark:even:bg-gray-800 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
                                 >
-                                    <td className="px-5 py-4 text-sm">
-                                        <p className="text-gray-900 dark:text-white whitespace-no-wrap">
+                                    <td className="px-6 py-4 text-sm">
+                                        <p className="text-gray-900 dark:text-gray-100 whitespace-nowrap font-medium">
                                             {skill.name}
                                         </p>
                                     </td>
-                                    <td className="px-5 py-4 text-sm">
+                                    <td className="px-6 py-4 text-sm">
                                         <img
                                             src={skill.lightColorPath}
                                             alt={`${skill.name} Light`}
-                                            className="w-10 h-10"
+                                            className="h-10 w-10 rounded-md ring-1 ring-gray-200 dark:ring-gray-700 object-contain p-1 bg-white"
                                         />
                                     </td>
-                                    <td className="px-5 py-4 text-sm">
-                                        <div className="bg-gray-800 dark:bg-gray-900 p-1 rounded-md inline-block">
+                                    <td className="px-6 py-4 text-sm">
+                                        <div className="bg-gray-900 p-1 rounded-md inline-block ring-1 ring-gray-800">
                                             <img
                                                 src={skill.darkColorPath}
                                                 alt={`${skill.name} Dark`}
-                                                className="w-10 h-10"
+                                                className="h-10 w-10 object-contain"
                                             />
                                         </div>
                                     </td>
-                                    <td className="px-5 py-4 text-sm text-right">
+                                    <td className="px-6 py-4 text-sm text-right">
                                         <button
                                             onClick={() => openModal(skill)}
-                                            className="text-yellow-500 hover:text-yellow-700 mr-4"
+                                            className="inline-flex items-center justify-center p-2 rounded-lg text-yellow-600 hover:text-yellow-700 hover:bg-yellow-50 dark:hover:bg-yellow-900/20 transition-colors mr-2 focus:outline-none focus:ring-4 focus:ring-yellow-500/20"
                                         >
-                                            <FiEdit size={20} />
+                                            <FiEdit className="h-5 w-5" />
                                         </button>
                                         <button
                                             onClick={() =>
                                                 handleDelete(skill._id)
                                             }
-                                            className="text-red-500 hover:text-red-700"
+                                            className="inline-flex items-center justify-center p-2 rounded-lg text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors focus:outline-none focus:ring-4 focus:ring-red-500/20"
                                         >
-                                            <FiTrash2 size={20} />
+                                            <FiTrash2 className="h-5 w-5" />
                                         </button>
                                     </td>
                                 </tr>
@@ -243,7 +238,7 @@ export default function SkillsPage() {
                             <tr>
                                 <td
                                     colSpan="4"
-                                    className="text-center py-10 text-gray-500"
+                                    className="text-center py-16 text-gray-500 dark:text-gray-400"
                                 >
                                     No skills found.
                                 </td>
@@ -272,17 +267,17 @@ export default function SkillsPage() {
                         <button
                             onClick={() => paginate(currentPage - 1)}
                             disabled={currentPage === 1}
-                            className="p-2 rounded-md disabled:opacity-50 disabled:cursor-not-allowed bg-gray-200 dark:bg-gray-700"
+                            className="inline-flex items-center justify-center rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-2 hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none focus:ring-4 focus:ring-blue-500/20"
                         >
                             <FiChevronLeft />
                         </button>
-                        <span className="text-sm">
+                        <span className="text-sm text-gray-700 dark:text-gray-300">
                             Page {currentPage} of {pagination.totalPages}
                         </span>
                         <button
                             onClick={() => paginate(currentPage + 1)}
                             disabled={currentPage === pagination.totalPages}
-                            className="p-2 rounded-md disabled:opacity-50 disabled:cursor-not-allowed bg-gray-200 dark:bg-gray-700"
+                            className="inline-flex items-center justify-center rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-2 hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none focus:ring-4 focus:ring-blue-500/20"
                         >
                             <FiChevronRight />
                         </button>
@@ -291,8 +286,8 @@ export default function SkillsPage() {
             )}
 
             {isModalOpen && (
-                <div className="fixed inset-0 bg-black/60 bg-opacity-60 flex justify-center items-center z-50">
-                    <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-xl w-full max-w-md">
+                <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex justify-center items-center z-50 p-4">
+                    <div className="bg-white dark:bg-gray-900 w-full max-w-md rounded-2xl shadow-lg ring-1 ring-gray-200 dark:ring-gray-800 p-6 md:p-7">
                         <h2 className="text-2xl font-bold mb-6 text-gray-900 dark:text-white">
                             {currentSkill ? "Edit Skill" : "Tambah Skill Baru"}
                         </h2>
@@ -304,23 +299,10 @@ export default function SkillsPage() {
                                 <input
                                     type="text"
                                     name="name"
+                                    placeholder="masukkan nama skill"
                                     value={formData.name}
                                     onChange={handleInputChange}
-                                    className="w-full px-3 py-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600"
-                                    required
-                                />
-                            </div>
-                            <div className="mb-4">
-                                <label className="block mb-2 text-sm font-bold text-gray-700 dark:text-gray-300">
-                                    Light SVG Filename
-                                </label>
-                                <input
-                                    type="text"
-                                    name="lightImageName"
-                                    value={formData.lightImageName}
-                                    onChange={handleInputChange}
-                                    className="w-full px-3 py-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600"
-                                    placeholder="contoh: vscode-light.svg"
+                                    className="w-full px-3 py-2.5 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 placeholder:text-gray-400 focus:outline-none focus:ring-4 focus:ring-blue-500/20 focus:border-blue-500 transition"
                                     required
                                 />
                             </div>
@@ -332,23 +314,9 @@ export default function SkillsPage() {
                                     type="file"
                                     name="lightImage"
                                     onChange={handleFileChange}
-                                    className="w-full text-sm"
+                                    className="block w-full text-sm file:mr-4 file:rounded-lg file:border-0 file:bg-blue-50 file:px-4 file:py-2 file:text-blue-700 hover:file:bg-blue-100 dark:file:bg-blue-900/20 dark:file:text-blue-300"
                                     accept=".svg"
                                     required={!currentSkill}
-                                />
-                            </div>
-                            <div className="mb-4">
-                                <label className="block mb-2 text-sm font-bold text-gray-700 dark:text-gray-300">
-                                    Dark SVG Filename
-                                </label>
-                                <input
-                                    type="text"
-                                    name="darkImageName"
-                                    value={formData.darkImageName}
-                                    onChange={handleInputChange}
-                                    className="w-full px-3 py-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600"
-                                    placeholder="contoh: vscode-dark.svg"
-                                    required
                                 />
                             </div>
                             <div className="mb-6">
@@ -359,7 +327,7 @@ export default function SkillsPage() {
                                     type="file"
                                     name="darkImage"
                                     onChange={handleFileChange}
-                                    className="w-full text-sm"
+                                    className="block w-full text-sm file:mr-4 file:rounded-lg file:border-0 file:bg-blue-50 file:px-4 file:py-2 file:text-blue-700 hover:file:bg-blue-100 dark:file:bg-blue-900/20 dark:file:text-blue-300"
                                     accept=".svg"
                                     required={!currentSkill}
                                 />
@@ -368,13 +336,13 @@ export default function SkillsPage() {
                                 <button
                                     type="button"
                                     onClick={closeModal}
-                                    className="bg-gray-500 hover:bg-gray-600 text-white font-bold py-2 px-4 rounded-lg transition-colors"
+                                    className="inline-flex items-center justify-center rounded-xl bg-gray-100 hover:bg-gray-200 dark:bg-gray-800 dark:hover:bg-gray-700 text-gray-800 dark:text-gray-200 font-medium px-4 py-2.5 transition-colors focus:outline-none focus:ring-4 focus:ring-gray-500/20"
                                 >
                                     Batal
                                 </button>
                                 <button
                                     type="submit"
-                                    className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg transition-colors"
+                                    className="inline-flex items-center justify-center rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-medium px-4 py-2.5 shadow-sm transition-colors focus:outline-none focus:ring-4 focus:ring-blue-500/20 active:scale-[0.99]"
                                 >
                                     {currentSkill ? "Update" : "Simpan"}
                                 </button>

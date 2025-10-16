@@ -8,20 +8,16 @@ export async function GET(request) {
 
     const { searchParams } = new URL(request.url);
     const page = parseInt(searchParams.get("page")) || 1;
-    const limit = parseInt(searchParams.get("limit")) || 10; // Ubah default limit menjadi 10
+    const limit = parseInt(searchParams.get("limit")) || 10;
     const searchQuery = searchParams.get("name") || "";
     const skip = (page - 1) * limit;
 
-    // Buat query filter untuk pencarian
     const filter = searchQuery
-        ? { name: { $regex: searchQuery, $options: "i" } } // 'i' untuk case-insensitive
+        ? { name: { $regex: searchQuery, $options: "i" } }
         : {};
 
     try {
-        // Hitung total dokumen berdasarkan filter
         const totalSkills = await Skill.countDocuments(filter);
-
-        // Ambil data dengan filter, sort, skip, dan limit
         const skills = await Skill.find(filter)
             .sort({ name: 1 })
             .skip(skip)
@@ -55,36 +51,31 @@ export async function GET(request) {
     }
 }
 
-// ... (Fungsi POST tetap sama seperti sebelumnya)
 export async function POST(request) {
     await dbConnect();
     const formData = await request.formData();
     const name = formData.get("name");
     const lightImage = formData.get("lightImage");
     const darkImage = formData.get("darkImage");
-    const lightImageName = formData.get("lightImageName");
-    const darkImageName = formData.get("darkImageName");
 
-    if (
-        !name ||
-        !lightImage ||
-        !darkImage ||
-        !lightImageName ||
-        !darkImageName
-    ) {
+    if (!name || !lightImage || !darkImage) {
         return NextResponse.json(
             { success: false, error: "Semua field wajib diisi" },
             { status: 400 }
         );
     }
 
+    const transformedName = name.toLowerCase().replace(/\s+/g, "-");
+    const lightImageName = `${transformedName}-light.svg`;
+    const darkImageName = `${transformedName}-dark.svg`;
+
     try {
-        const existingSkill = await Skill.findOne({ name });
+        const existingSkill = await Skill.findOne({ name: transformedName });
         if (existingSkill) {
             return NextResponse.json(
                 {
                     success: false,
-                    error: `Skill dengan nama "${name}" sudah ada.`,
+                    error: `Skill dengan nama "${transformedName}" sudah ada.`,
                 },
                 { status: 409 }
             );
@@ -107,7 +98,7 @@ export async function POST(request) {
         );
 
         const newSkill = new Skill({
-            name,
+            name: transformedName,
             lightColorPath: lightImageName,
             darkColorPath: darkImageName,
         });
@@ -123,7 +114,7 @@ export async function POST(request) {
             return NextResponse.json(
                 {
                     success: false,
-                    error: `Skill dengan nama "${name}" sudah ada.`,
+                    error: `Skill dengan nama "${transformedName}" sudah ada.`,
                 },
                 { status: 409 }
             );

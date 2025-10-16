@@ -4,8 +4,6 @@ import Skill from "../../../../models/Skill";
 import minioClient from "../../../../lib/minio";
 import { CopyConditions } from "minio";
 
-// GET dan DELETE (tidak ada perubahan)
-// ... (salin fungsi GET dan DELETE dari jawaban sebelumnya)
 export async function GET(request, { params }) {
     await dbConnect();
     try {
@@ -32,25 +30,25 @@ export async function PUT(request, { params }) {
     const name = formData.get("name");
     const lightImage = formData.get("lightImage");
     const darkImage = formData.get("darkImage");
-    const newLightImageName = formData.get("lightImageName");
-    const newDarkImageName = formData.get("darkImageName");
+
+    const transformedName = name.toLowerCase().replace(/\s+/g, "-");
+    const newLightImageName = `${transformedName}-light.svg`;
+    const newDarkImageName = `${transformedName}-dark.svg`;
 
     try {
-        // === VALIDASI NAMA UNIK SAAT UPDATE ===
         const existingSkill = await Skill.findOne({
-            name: name,
+            name: transformedName,
             _id: { $ne: params.id },
         });
         if (existingSkill) {
             return NextResponse.json(
                 {
                     success: false,
-                    error: `Skill dengan nama "${name}" sudah ada.`,
+                    error: `Skill dengan nama "${transformedName}" sudah ada.`,
                 },
                 { status: 409 }
             );
         }
-        // =====================================
 
         const skill = await Skill.findById(params.id);
         if (!skill) {
@@ -64,7 +62,6 @@ export async function PUT(request, { params }) {
         let finalDarkPath = skill.darkColorPath;
         const bucketName = process.env.MINIO_BUCKET;
 
-        // Logika untuk handle gambar (tidak ada perubahan dari sebelumnya)
         if (lightImage && lightImage.size > 0) {
             const lightImageBuffer = Buffer.from(
                 await lightImage.arrayBuffer()
@@ -128,7 +125,7 @@ export async function PUT(request, { params }) {
         const updatedSkill = await Skill.findByIdAndUpdate(
             params.id,
             {
-                name,
+                name: transformedName,
                 lightColorPath: finalLightPath,
                 darkColorPath: finalDarkPath,
             },
@@ -142,7 +139,7 @@ export async function PUT(request, { params }) {
             return NextResponse.json(
                 {
                     success: false,
-                    error: `Skill dengan nama "${name}" sudah ada.`,
+                    error: `Skill dengan nama "${transformedName}" sudah ada.`,
                 },
                 { status: 409 }
             );

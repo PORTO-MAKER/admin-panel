@@ -4,7 +4,7 @@ const SkillSchema = new mongoose.Schema({
     name: {
         type: String,
         required: true,
-        unique: true, // Tambahkan baris ini
+        unique: true,
     },
     lightColorPath: {
         type: String,
