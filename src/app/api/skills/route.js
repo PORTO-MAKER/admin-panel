@@ -152,7 +152,7 @@ export async function POST(request) {
         );
 
         const newSkill = new Skill({
-            name: transformedName,
+            name,
             lightColorPath: lightImageName,
             darkColorPath: darkImageName,
         });
