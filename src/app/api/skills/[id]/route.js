@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import dbConnect from "../../../../lib/mongodb";
 import Skill from "../../../../models/Skill";
+import SkillCategory from "../../../../models/SkillCategory";
 import minioClient from "../../../../lib/minio";
 import { CopyConditions } from "minio";
 
@@ -30,26 +31,13 @@ export async function PUT(request, { params }) {
     const name = formData.get("name");
     const lightImage = formData.get("lightImage");
     const darkImage = formData.get("darkImage");
+    const categoryId = formData.get("category");
 
     const transformedName = name.toLowerCase().replace(/\s+/g, "-");
     const newLightImageName = `${transformedName}-light.svg`;
     const newDarkImageName = `${transformedName}-dark.svg`;
 
     try {
-        const existingSkill = await Skill.findOne({
-            name: transformedName,
-            _id: { $ne: params.id },
-        });
-        if (existingSkill) {
-            return NextResponse.json(
-                {
-                    success: false,
-                    error: `Skill dengan nama "${transformedName}" sudah ada.`,
-                },
-                { status: 409 }
-            );
-        }
-
         const skill = await Skill.findById(params.id);
         if (!skill) {
             return NextResponse.json(
@@ -57,6 +45,8 @@ export async function PUT(request, { params }) {
                 { status: 404 }
             );
         }
+
+        const oldCategory = await SkillCategory.findOne({ skills: params.id });
 
         let finalLightPath = skill.lightColorPath;
         let finalDarkPath = skill.darkColorPath;
@@ -122,15 +112,30 @@ export async function PUT(request, { params }) {
             finalDarkPath = newDarkImageName;
         }
 
+        const updatedSkillData = {
+            name: transformedName,
+            lightColorPath: finalLightPath,
+            darkColorPath: finalDarkPath,
+        };
+
         const updatedSkill = await Skill.findByIdAndUpdate(
             params.id,
-            {
-                name: transformedName,
-                lightColorPath: finalLightPath,
-                darkColorPath: finalDarkPath,
-            },
-            { new: true, runValidators: true }
+            updatedSkillData,
+            { new: true }
         );
+
+        if (oldCategory && oldCategory._id.toString() !== categoryId) {
+            await SkillCategory.findByIdAndUpdate(oldCategory._id, {
+                $pull: { skills: params.id },
+            });
+            await SkillCategory.findByIdAndUpdate(categoryId, {
+                $push: { skills: params.id },
+            });
+        } else if (!oldCategory && categoryId) {
+            await SkillCategory.findByIdAndUpdate(categoryId, {
+                $push: { skills: params.id },
+            });
+        }
 
         return NextResponse.json({ success: true, data: updatedSkill });
     } catch (error) {
@@ -174,10 +179,13 @@ export async function DELETE(request, { params }) {
             `skill_icons/${skill.darkColorPath}`
         );
 
-        const deletedSkill = await Skill.deleteOne({ _id: params.id });
-        if (!deletedSkill) {
-            return NextResponse.json({ success: false }, { status: 400 });
-        }
+        await SkillCategory.updateMany(
+            { skills: params.id },
+            { $pull: { skills: params.id } }
+        );
+
+        await Skill.deleteOne({ _id: params.id });
+
         return NextResponse.json({ success: true, data: {} });
     } catch (error) {
         console.error(`DELETE /api/skills/${params.id} Error:`, error);

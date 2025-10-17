@@ -21,12 +21,13 @@ export function middleware(request) {
     }
 
     const authToken = request.cookies.get("auth-token")?.value;
+    const isAuthPage = pathname === "/login";
 
-    if (!authToken && pathname !== "/login") {
+    if (!authToken && !isAuthPage) {
         return NextResponse.redirect(new URL("/login", request.url));
     }
 
-    if (authToken && pathname === "/login") {
+    if (authToken && isAuthPage) {
         return NextResponse.redirect(new URL("/", request.url));
     }
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import {
     FiEdit,
     FiTrash2,
@@ -8,17 +8,20 @@ import {
     FiChevronLeft,
     FiChevronRight,
     FiSearch,
+    FiFilter,
 } from "react-icons/fi";
 import { useDebounce } from "../utils/debounce";
 
 export default function SkillsPage() {
     const [skills, setSkills] = useState([]);
+    const [categories, setCategories] = useState([]);
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [currentSkill, setCurrentSkill] = useState(null);
     const [formData, setFormData] = useState({
         name: "",
         lightImage: null,
         darkImage: null,
+        category: "",
     });
 
     const [pagination, setPagination] = useState({
@@ -28,27 +31,44 @@ export default function SkillsPage() {
     });
     const [currentPage, setCurrentPage] = useState(1);
     const [searchQuery, setSearchQuery] = useState("");
-    const itemsPerPage = 10;
+    const [selectedCategory, setSelectedCategory] = useState("all");
 
+    const itemsPerPage = 10;
     const debouncedSearchQuery = useDebounce(searchQuery, 300);
 
-    const fetchSkills = useCallback(
-        async (page, search) => {
+    const fetchSkillsAndCategories = useCallback(
+        async (page, search, categoryId) => {
             try {
-                const res = await fetch(
-                    `/api/skills?page=${page}&limit=${itemsPerPage}&name=${search}`,
-                    {
+                const [skillsRes, categoriesRes] = await Promise.all([
+                    fetch(
+                        `/api/skills?page=${page}&limit=${itemsPerPage}&name=${search}&category=${categoryId}`,
+                        {
+                            headers: {
+                                "X-secret-code":
+                                    process.env.NEXT_PUBLIC_API_SECRET_KEY,
+                            },
+                        }
+                    ),
+                    fetch("/api/skill-categories", {
                         headers: {
                             "X-secret-code":
                                 process.env.NEXT_PUBLIC_API_SECRET_KEY,
                         },
-                    }
-                );
-                if (!res.ok) throw new Error("Gagal mengambil data skills");
+                    }),
+                ]);
 
-                const { data, pagination: paginationData } = await res.json();
-                setSkills(data);
+                if (!skillsRes.ok)
+                    throw new Error("Gagal mengambil data skills");
+                if (!categoriesRes.ok)
+                    throw new Error("Gagal mengambil data kategori");
+
+                const { data: skillsData, pagination: paginationData } =
+                    await skillsRes.json();
+                const { data: categoriesData } = await categoriesRes.json();
+
+                setSkills(skillsData);
                 setPagination(paginationData);
+                setCategories(categoriesData);
             } catch (error) {
                 console.error(error);
             }
@@ -57,14 +77,34 @@ export default function SkillsPage() {
     );
 
     useEffect(() => {
-        fetchSkills(currentPage, debouncedSearchQuery);
-    }, [currentPage, debouncedSearchQuery, fetchSkills]);
+        fetchSkillsAndCategories(
+            currentPage,
+            debouncedSearchQuery,
+            selectedCategory
+        );
+    }, [
+        currentPage,
+        debouncedSearchQuery,
+        selectedCategory,
+        fetchSkillsAndCategories,
+    ]);
 
     useEffect(() => {
         if (currentPage !== 1) {
             setCurrentPage(1);
         }
-    }, [debouncedSearchQuery]);
+    }, [debouncedSearchQuery, selectedCategory]);
+
+    const skillCategoryMap = useMemo(() => {
+        const map = new Map();
+        categories.forEach((cat) => {
+            cat.skills.forEach((skill) => {
+                const skillId = typeof skill === "string" ? skill : skill._id;
+                map.set(skillId, cat.name);
+            });
+        });
+        return map;
+    }, [categories]);
 
     const paginate = (pageNumber) => {
         if (pageNumber < 1 || pageNumber > pagination.totalPages) return;
@@ -73,6 +113,7 @@ export default function SkillsPage() {
 
     const handleInputChange = (e) =>
         setFormData({ ...formData, [e.target.name]: e.target.value });
+
     const handleFileChange = (e) =>
         setFormData({ ...formData, [e.target.name]: e.target.files[0] });
 
@@ -82,6 +123,7 @@ export default function SkillsPage() {
         data.append("name", formData.name);
         if (formData.lightImage) data.append("lightImage", formData.lightImage);
         if (formData.darkImage) data.append("darkImage", formData.darkImage);
+        data.append("category", formData.category);
 
         const url = currentSkill
             ? `/api/skills/${currentSkill._id}`
@@ -97,7 +139,11 @@ export default function SkillsPage() {
                 },
             });
             if (res.ok) {
-                fetchSkills(currentPage, debouncedSearchQuery);
+                fetchSkillsAndCategories(
+                    currentPage,
+                    debouncedSearchQuery,
+                    selectedCategory
+                );
                 closeModal();
             } else {
                 const result = await res.json();
@@ -110,10 +156,14 @@ export default function SkillsPage() {
 
     const openModal = (skill = null) => {
         setCurrentSkill(skill);
+        const categoryOfSkill = categories.find((cat) =>
+            cat.skills.some((s) => s._id === skill?._id)
+        );
         setFormData({
             name: skill ? skill.name : "",
             lightImage: null,
             darkImage: null,
+            category: categoryOfSkill ? categoryOfSkill._id : "",
         });
         setIsModalOpen(true);
     };
@@ -136,7 +186,11 @@ export default function SkillsPage() {
                     if (skills.length === 1 && currentPage > 1) {
                         setCurrentPage(currentPage - 1);
                     } else {
-                        fetchSkills(currentPage, debouncedSearchQuery);
+                        fetchSkillsAndCategories(
+                            currentPage,
+                            debouncedSearchQuery,
+                            selectedCategory
+                        );
                     }
                 } else {
                     const result = await res.json();
@@ -157,6 +211,25 @@ export default function SkillsPage() {
                     Manage Skills
                 </h1>
                 <div className="flex items-center gap-4 w-full md:w-auto">
+                    <div className="relative w-full md:w-56 group">
+                        <span className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
+                            <FiFilter className="h-5 w-5 text-gray-400 group-focus-within:text-blue-600 transition-colors" />
+                        </span>
+                        <select
+                            value={selectedCategory}
+                            onChange={(e) =>
+                                setSelectedCategory(e.target.value)
+                            }
+                            className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 placeholder:text-gray-400 focus:outline-none focus:ring-4 focus:ring-blue-500/20 focus:border-blue-500 transition"
+                        >
+                            <option value="all">Semua Kategori</option>
+                            {categories.map((cat) => (
+                                <option key={cat._id} value={cat._id}>
+                                    {cat.name}
+                                </option>
+                            ))}
+                        </select>
+                    </div>
                     <div className="relative w-full md:w-72 group">
                         <span className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
                             <FiSearch className="h-5 w-5 text-gray-400 group-focus-within:text-blue-600 transition-colors" />
@@ -183,6 +256,7 @@ export default function SkillsPage() {
                     <thead>
                         <tr className="border-b-2 border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-700 text-left text-xs font-semibold text-gray-600 dark:text-gray-300 uppercase tracking-wider">
                             <th className="px-5 py-3">Skill Name</th>
+                            <th className="px-5 py-3">Kategori</th>
                             <th className="px-5 py-3">Light Icon</th>
                             <th className="px-5 py-3">Dark Icon</th>
                             <th className="px-5 py-3 text-right">Actions</th>
@@ -198,6 +272,12 @@ export default function SkillsPage() {
                                     <td className="px-6 py-4 text-sm">
                                         <p className="text-gray-900 dark:text-gray-100 whitespace-nowrap font-medium">
                                             {skill.name}
+                                        </p>
+                                    </td>
+                                    <td className="px-6 py-4 text-sm">
+                                        <p className="text-gray-900 dark:text-gray-100 whitespace-nowrap">
+                                            {skillCategoryMap.get(skill._id) ||
+                                                "N/A"}
                                         </p>
                                     </td>
                                     <td className="px-6 py-4 text-sm">
@@ -237,7 +317,7 @@ export default function SkillsPage() {
                         ) : (
                             <tr>
                                 <td
-                                    colSpan="4"
+                                    colSpan="5"
                                     className="text-center py-16 text-gray-500 dark:text-gray-400"
                                 >
                                     No skills found.
@@ -252,10 +332,14 @@ export default function SkillsPage() {
                 <div className="flex justify-between items-center mt-6">
                     <span className="text-sm text-gray-700 dark:text-gray-400">
                         Showing{" "}
-                        <span className="font-semibold">{firstItemNumber}</span>{" "}
+                        <span className="font-semibold">
+                            {firstItemNumber > 0 ? firstItemNumber : 0}
+                        </span>{" "}
                         to{" "}
                         <span className="font-semibold">
-                            {firstItemNumber + skills.length - 1}
+                            {firstItemNumber > 0
+                                ? firstItemNumber + skills.length - 1
+                                : 0}
                         </span>{" "}
                         of{" "}
                         <span className="font-semibold">
@@ -305,6 +389,27 @@ export default function SkillsPage() {
                                     className="w-full px-3 py-2.5 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 placeholder:text-gray-400 focus:outline-none focus:ring-4 focus:ring-blue-500/20 focus:border-blue-500 transition"
                                     required
                                 />
+                            </div>
+                            <div className="mb-4">
+                                <label className="block mb-2 text-sm font-bold text-gray-700 dark:text-gray-300">
+                                    Kategori
+                                </label>
+                                <select
+                                    name="category"
+                                    value={formData.category}
+                                    onChange={handleInputChange}
+                                    className="w-full px-3 py-2.5 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 placeholder:text-gray-400 focus:outline-none focus:ring-4 focus:ring-blue-500/20 focus:border-blue-500 transition"
+                                    required
+                                >
+                                    <option value="" disabled>
+                                        Pilih kategori
+                                    </option>
+                                    {categories.map((cat) => (
+                                        <option key={cat._id} value={cat._id}>
+                                            {cat.name}
+                                        </option>
+                                    ))}
+                                </select>
                             </div>
                             <div className="mb-4">
                                 <label className="block mb-2 text-sm font-bold text-gray-700 dark:text-gray-300">

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import dbConnect from "../../../lib/mongodb";
 import Skill from "../../../models/Skill";
+import SkillCategory from "../../../models/SkillCategory";
 import minioClient from "../../../lib/minio";
 
 export async function GET(request) {
@@ -10,13 +11,33 @@ export async function GET(request) {
     const page = parseInt(searchParams.get("page")) || 1;
     const limit = parseInt(searchParams.get("limit")) || 10;
     const searchQuery = searchParams.get("name") || "";
+    const categoryId = searchParams.get("category") || "all";
     const skip = (page - 1) * limit;
 
-    const filter = searchQuery
-        ? { name: { $regex: searchQuery, $options: "i" } }
-        : {};
+    let filter = {};
+
+    if (searchQuery) {
+        filter.name = { $regex: searchQuery, $options: "i" };
+    }
 
     try {
+        if (categoryId && categoryId !== "all") {
+            const category = await SkillCategory.findById(categoryId).lean();
+            if (category) {
+                filter._id = { $in: category.skills };
+            } else {
+                return NextResponse.json({
+                    success: true,
+                    data: [],
+                    pagination: {
+                        currentPage: 1,
+                        totalPages: 0,
+                        totalSkills: 0,
+                    },
+                });
+            }
+        }
+
         const totalSkills = await Skill.countDocuments(filter);
         const skills = await Skill.find(filter)
             .sort({ name: 1 })
@@ -57,8 +78,9 @@ export async function POST(request) {
     const name = formData.get("name");
     const lightImage = formData.get("lightImage");
     const darkImage = formData.get("darkImage");
+    const categoryId = formData.get("category");
 
-    if (!name || !lightImage || !darkImage) {
+    if (!name || !lightImage || !darkImage || !categoryId) {
         return NextResponse.json(
             { success: false, error: "Semua field wajib diisi" },
             { status: 400 }
@@ -103,6 +125,10 @@ export async function POST(request) {
             darkColorPath: darkImageName,
         });
         await newSkill.save();
+
+        await SkillCategory.findByIdAndUpdate(categoryId, {
+            $push: { skills: newSkill._id },
+        });
 
         return NextResponse.json(
             { success: true, data: newSkill },
