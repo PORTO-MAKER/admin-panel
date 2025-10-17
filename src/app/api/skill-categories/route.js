@@ -23,7 +23,7 @@ export async function GET(request) {
             headers: {
                 "Content-Type": "application/json",
                 "Cache-Control":
-                    "public, max-age=60, s-maxage=60, stale-while-revalidate=86400",
+                    "private, max-age=60, s-maxage=60, stale-while-revalidate=86400",
                 ETag: etag,
             },
         });
