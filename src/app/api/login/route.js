@@ -8,8 +8,8 @@ export async function POST(request) {
         const { password } = await request.json();
 
         if (password === PASSWORD) {
-            const cookieStore = cookies();
-            cookieStore.set("auth-token", "true", {
+            const cookieStore = await cookies();
+            await cookieStore.set("auth-token", "true", {
                 path: "/",
                 httpOnly: true,
                 secure: process.env.NODE_ENV === "production",

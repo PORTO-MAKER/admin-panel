@@ -14,7 +14,8 @@ import { useDebounce } from "../utils/debounce";
 
 export default function SkillsPage() {
     const [skills, setSkills] = useState([]);
-    const [categories, setCategories] = useState([]);
+    const [allCategories, setAllCategories] = useState([]); // Untuk filter dan tampilan tabel
+    const [modalCategories, setModalCategories] = useState([]); // Khusus untuk dropdown di modal
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [currentSkill, setCurrentSkill] = useState(null);
     const [formData, setFormData] = useState({
@@ -36,7 +37,8 @@ export default function SkillsPage() {
     const itemsPerPage = 10;
     const debouncedSearchQuery = useDebounce(searchQuery, 300);
 
-    const fetchSkillsAndCategories = useCallback(
+    // Mengambil data skills dan semua kategori (untuk tampilan tabel dan filter)
+    const fetchDataForPage = useCallback(
         async (page, search, categoryId) => {
             try {
                 const [skillsRes, categoriesRes] = await Promise.all([
@@ -50,6 +52,7 @@ export default function SkillsPage() {
                         }
                     ),
                     fetch("/api/skill-categories", {
+                        // API ini sekarang ringan
                         headers: {
                             "X-secret-code":
                                 process.env.NEXT_PUBLIC_API_SECRET_KEY,
@@ -68,7 +71,7 @@ export default function SkillsPage() {
 
                 setSkills(skillsData);
                 setPagination(paginationData);
-                setCategories(categoriesData);
+                setAllCategories(categoriesData);
             } catch (error) {
                 console.error(error);
             }
@@ -77,34 +80,29 @@ export default function SkillsPage() {
     );
 
     useEffect(() => {
-        fetchSkillsAndCategories(
-            currentPage,
-            debouncedSearchQuery,
-            selectedCategory
-        );
-    }, [
-        currentPage,
-        debouncedSearchQuery,
-        selectedCategory,
-        fetchSkillsAndCategories,
-    ]);
+        fetchDataForPage(currentPage, debouncedSearchQuery, selectedCategory);
+    }, [currentPage, debouncedSearchQuery, selectedCategory, fetchDataForPage]);
 
+    // Reset ke halaman 1 jika filter atau pencarian berubah
     useEffect(() => {
         if (currentPage !== 1) {
             setCurrentPage(1);
         }
     }, [debouncedSearchQuery, selectedCategory]);
 
+    // Membuat pemetaan dari skill ID ke nama kategori untuk tampilan tabel
     const skillCategoryMap = useMemo(() => {
         const map = new Map();
-        categories.forEach((cat) => {
-            cat.skills.forEach((skill) => {
-                const skillId = typeof skill === "string" ? skill : skill._id;
-                map.set(skillId, cat.name);
-            });
+        allCategories.forEach((cat) => {
+            // pastikan cat.skills ada sebelum melakukan iterasi
+            if (cat.skills && Array.isArray(cat.skills)) {
+                cat.skills.forEach((skillId) => {
+                    map.set(skillId, cat.name);
+                });
+            }
         });
         return map;
-    }, [categories]);
+    }, [allCategories]);
 
     const paginate = (pageNumber) => {
         if (pageNumber < 1 || pageNumber > pagination.totalPages) return;
@@ -113,7 +111,6 @@ export default function SkillsPage() {
 
     const handleInputChange = (e) =>
         setFormData({ ...formData, [e.target.name]: e.target.value });
-
     const handleFileChange = (e) =>
         setFormData({ ...formData, [e.target.name]: e.target.files[0] });
 
@@ -121,9 +118,9 @@ export default function SkillsPage() {
         e.preventDefault();
         const data = new FormData();
         data.append("name", formData.name);
+        data.append("category", formData.category);
         if (formData.lightImage) data.append("lightImage", formData.lightImage);
         if (formData.darkImage) data.append("darkImage", formData.darkImage);
-        data.append("category", formData.category);
 
         const url = currentSkill
             ? `/api/skills/${currentSkill._id}`
@@ -139,7 +136,7 @@ export default function SkillsPage() {
                 },
             });
             if (res.ok) {
-                fetchSkillsAndCategories(
+                fetchDataForPage(
                     currentPage,
                     debouncedSearchQuery,
                     selectedCategory
@@ -154,11 +151,28 @@ export default function SkillsPage() {
         }
     };
 
-    const openModal = (skill = null) => {
+    const openModal = async (skill = null) => {
         setCurrentSkill(skill);
-        const categoryOfSkill = categories.find((cat) =>
-            cat.skills.some((s) => s._id === skill?._id)
+
+        // Hanya mengambil kategori saat modal dibuka
+        try {
+            const res = await fetch("/api/skill-categories", {
+                headers: {
+                    "X-secret-code": process.env.NEXT_PUBLIC_API_SECRET_KEY,
+                },
+            });
+            if (res.ok) {
+                const { data } = await res.json();
+                setModalCategories(data);
+            }
+        } catch (error) {
+            console.error("Gagal mengambil kategori untuk modal", error);
+        }
+
+        const categoryOfSkill = allCategories.find(
+            (cat) => cat.skills && cat.skills.some((s) => s === skill?._id)
         );
+
         setFormData({
             name: skill ? skill.name : "",
             lightImage: null,
@@ -171,6 +185,7 @@ export default function SkillsPage() {
     const closeModal = () => {
         setIsModalOpen(false);
         setCurrentSkill(null);
+        setModalCategories([]); // Kosongkan data modal
     };
 
     const handleDelete = async (id) => {
@@ -186,7 +201,7 @@ export default function SkillsPage() {
                     if (skills.length === 1 && currentPage > 1) {
                         setCurrentPage(currentPage - 1);
                     } else {
-                        fetchSkillsAndCategories(
+                        fetchDataForPage(
                             currentPage,
                             debouncedSearchQuery,
                             selectedCategory
@@ -202,7 +217,12 @@ export default function SkillsPage() {
         }
     };
 
-    const firstItemNumber = (pagination.currentPage - 1) * itemsPerPage + 1;
+    const firstItemNumber =
+        pagination.totalSkills > 0
+            ? (pagination.currentPage - 1) * itemsPerPage + 1
+            : 0;
+    const lastItemNumber =
+        firstItemNumber > 0 ? firstItemNumber + skills.length - 1 : 0;
 
     return (
         <div className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8 py-6">
@@ -213,17 +233,17 @@ export default function SkillsPage() {
                 <div className="flex items-center gap-4 w-full md:w-auto">
                     <div className="relative w-full md:w-56 group">
                         <span className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
-                            <FiFilter className="h-5 w-5 text-gray-400 group-focus-within:text-blue-600 transition-colors" />
+                            <FiFilter className="h-5 w-5 text-gray-400" />
                         </span>
                         <select
                             value={selectedCategory}
                             onChange={(e) =>
                                 setSelectedCategory(e.target.value)
                             }
-                            className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 placeholder:text-gray-400 focus:outline-none focus:ring-4 focus:ring-blue-500/20 focus:border-blue-500 transition"
+                            className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 focus:outline-none focus:ring-4 focus:ring-blue-500/20 focus:border-blue-500 transition"
                         >
                             <option value="all">Semua Kategori</option>
-                            {categories.map((cat) => (
+                            {allCategories.map((cat) => (
                                 <option key={cat._id} value={cat._id}>
                                     {cat.name}
                                 </option>
@@ -232,7 +252,7 @@ export default function SkillsPage() {
                     </div>
                     <div className="relative w-full md:w-72 group">
                         <span className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
-                            <FiSearch className="h-5 w-5 text-gray-400 group-focus-within:text-blue-600 transition-colors" />
+                            <FiSearch className="h-5 w-5 text-gray-400" />
                         </span>
                         <input
                             type="text"
@@ -328,19 +348,13 @@ export default function SkillsPage() {
                 </table>
             </div>
 
-            {pagination.totalSkills > itemsPerPage && (
+            {pagination.totalPages > 1 && (
                 <div className="flex justify-between items-center mt-6">
                     <span className="text-sm text-gray-700 dark:text-gray-400">
                         Showing{" "}
-                        <span className="font-semibold">
-                            {firstItemNumber > 0 ? firstItemNumber : 0}
-                        </span>{" "}
+                        <span className="font-semibold">{firstItemNumber}</span>{" "}
                         to{" "}
-                        <span className="font-semibold">
-                            {firstItemNumber > 0
-                                ? firstItemNumber + skills.length - 1
-                                : 0}
-                        </span>{" "}
+                        <span className="font-semibold">{lastItemNumber}</span>{" "}
                         of{" "}
                         <span className="font-semibold">
                             {pagination.totalSkills}
@@ -404,7 +418,7 @@ export default function SkillsPage() {
                                     <option value="" disabled>
                                         Pilih kategori
                                     </option>
-                                    {categories.map((cat) => (
+                                    {modalCategories.map((cat) => (
                                         <option key={cat._id} value={cat._id}>
                                             {cat.name}
                                         </option>

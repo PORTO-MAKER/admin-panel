@@ -6,7 +6,7 @@ export async function GET(request) {
     await dbConnect();
     try {
         const categories = await SkillCategory.find({})
-            .populate("skills")
+            .select("name skills")
             .sort({ name: 1 });
         return NextResponse.json({ success: true, data: categories });
     } catch (error) {
