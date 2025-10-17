@@ -124,12 +124,12 @@ export async function POST(request) {
     const darkImageName = `${transformedName}-dark.svg`;
 
     try {
-        const existingSkill = await Skill.findOne({ name: transformedName });
+        const existingSkill = await Skill.findOne({ name });
         if (existingSkill) {
             return NextResponse.json(
                 {
                     success: false,
-                    error: `Skill dengan nama "${transformedName}" sudah ada.`,
+                    error: `Skill dengan nama "${name}" sudah ada.`,
                 },
                 { status: 409 }
             );

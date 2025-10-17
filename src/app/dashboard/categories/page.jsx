@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { FiPlus } from "react-icons/fi";
 
 export default function CategoriesPage() {
     const [categories, setCategories] = useState([]);
@@ -28,39 +27,8 @@ export default function CategoriesPage() {
         fetchCategories();
     }, [fetchCategories]);
 
-    const openModal = () => {
-        setNewCategoryName("");
-        setIsModalOpen(true);
-    };
-
     const closeModal = () => {
         setIsModalOpen(false);
-    };
-
-    const handleAddCategory = async (e) => {
-        e.preventDefault();
-        if (!newCategoryName.trim()) return;
-
-        try {
-            const res = await fetch("/api/skill-categories", {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/json",
-                    "X-secret-code": process.env.NEXT_PUBLIC_API_SECRET_KEY,
-                },
-                body: JSON.stringify({ name: newCategoryName }),
-            });
-
-            if (res.ok) {
-                fetchCategories();
-                closeModal();
-            } else {
-                const result = await res.json();
-                alert(`Error: ${result.error || "Gagal menambahkan kategori"}`);
-            }
-        } catch (error) {
-            alert("Terjadi kesalahan saat menambahkan kategori.");
-        }
     };
 
     return (
@@ -69,12 +37,6 @@ export default function CategoriesPage() {
                 <h1 className="text-3xl md:text-4xl font-semibold tracking-tight text-gray-900 dark:text-white">
                     Manage Categories
                 </h1>
-                <button
-                    onClick={openModal}
-                    className="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-medium px-4 py-2.5 rounded-xl shadow-sm focus:outline-none focus:ring-4 focus:ring-blue-500/20 active:scale-[0.99] transition"
-                >
-                    <FiPlus className="h-5 w-5" /> Tambah
-                </button>
             </div>
 
             <div className="bg-white dark:bg-gray-900 shadow-sm ring-1 ring-gray-200 dark:ring-gray-800 rounded-2xl overflow-hidden">

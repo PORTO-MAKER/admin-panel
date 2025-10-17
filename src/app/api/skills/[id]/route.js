@@ -113,7 +113,7 @@ export async function PUT(request, { params }) {
         }
 
         const updatedSkillData = {
-            name: transformedName,
+            name,
             lightColorPath: finalLightPath,
             darkColorPath: finalDarkPath,
         };
