@@ -3,6 +3,7 @@ import dbConnect from "../../../lib/mongodb";
 import Skill from "../../../models/Skill";
 import SkillCategory from "../../../models/SkillCategory";
 import minioClient from "../../../lib/minio";
+import mongoose from "mongoose";
 
 export async function GET(request) {
     await dbConnect();
@@ -15,7 +16,6 @@ export async function GET(request) {
     const skip = (page - 1) * limit;
 
     let filter = {};
-
     if (searchQuery) {
         filter.name = { $regex: searchQuery, $options: "i" };
     }
@@ -24,7 +24,11 @@ export async function GET(request) {
         if (categoryId && categoryId !== "all") {
             const category = await SkillCategory.findById(categoryId).lean();
             if (category) {
-                filter._id = { $in: category.skills };
+                filter._id = {
+                    $in: category.skills.map(
+                        (id) => new mongoose.Types.ObjectId(id)
+                    ),
+                };
             } else {
                 return NextResponse.json({
                     success: true,
@@ -39,11 +43,40 @@ export async function GET(request) {
         }
 
         const totalSkills = await Skill.countDocuments(filter);
-        const skills = await Skill.find(filter)
-            .sort({ name: 1 })
-            .skip(skip)
-            .limit(limit)
-            .lean();
+
+        const skillsPipeline = [
+            { $match: filter },
+            {
+                $lookup: {
+                    from: "skillcategories",
+                    localField: "_id",
+                    foreignField: "skills",
+                    as: "categoryInfo",
+                },
+            },
+            {
+                $unwind: {
+                    path: "$categoryInfo",
+                    preserveNullAndEmptyArrays: true,
+                },
+            },
+            {
+                $addFields: {
+                    categoryName: "$categoryInfo.name",
+                    categoryId: "$categoryInfo._id",
+                },
+            },
+            {
+                $project: {
+                    categoryInfo: 0,
+                },
+            },
+            { $sort: { name: 1 } },
+            { $skip: skip },
+            { $limit: limit },
+        ];
+
+        const skills = await Skill.aggregate(skillsPipeline);
 
         const skillsWithUrls = skills.map((skill) => {
             const baseUrl = `https://${process.env.MINIO_ENDPOINT}/${process.env.MINIO_BUCKET}/skill_icons`;
@@ -71,7 +104,6 @@ export async function GET(request) {
         );
     }
 }
-
 export async function POST(request) {
     await dbConnect();
     const formData = await request.formData();

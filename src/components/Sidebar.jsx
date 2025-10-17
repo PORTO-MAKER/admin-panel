@@ -5,8 +5,8 @@ import { usePathname } from "next/navigation";
 import { FiGrid, FiTag } from "react-icons/fi";
 
 const navLinks = [
-    { href: "/", label: "Skills", icon: FiGrid },
-    { href: "/categories", label: "Categories", icon: FiTag },
+    { href: "/dashboard", label: "Skills", icon: FiGrid },
+    { href: "/dashboard/categories", label: "Categories", icon: FiTag },
 ];
 
 export default function Sidebar() {
