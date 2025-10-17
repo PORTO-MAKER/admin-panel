@@ -11,6 +11,7 @@ import {
     FiFilter,
 } from "react-icons/fi";
 import { useDebounce } from "../../utils/debounce";
+import toast, { Toaster } from "react-hot-toast";
 
 export default function SkillsPage() {
     const [skills, setSkills] = useState([]);
@@ -59,6 +60,7 @@ export default function SkillsPage() {
                 setPagination(paginationData);
             } catch (error) {
                 console.error(error);
+                toast.error("Gagal mengambil data skills.");
             }
         },
         [itemsPerPage]
@@ -118,14 +120,13 @@ export default function SkillsPage() {
             : "/api/skills";
         const method = currentSkill ? "PUT" : "POST";
 
-        try {
-            const res = await fetch(url, {
-                method,
-                body: data,
-                headers: {
-                    "X-secret-code": process.env.NEXT_PUBLIC_API_SECRET_KEY,
-                },
-            });
+        const promise = fetch(url, {
+            method,
+            body: data,
+            headers: {
+                "X-secret-code": process.env.NEXT_PUBLIC_API_SECRET_KEY,
+            },
+        }).then(async (res) => {
             if (res.ok) {
                 fetchSkills(
                     currentPage,
@@ -133,13 +134,18 @@ export default function SkillsPage() {
                     selectedCategory
                 );
                 closeModal();
+                return "Skill berhasil disimpan.";
             } else {
                 const result = await res.json();
-                alert(`Error: ${result.error}`);
+                throw new Error(result.error || "Terjadi kesalahan.");
             }
-        } catch (error) {
-            alert("Terjadi kesalahan. Silakan cek konsol.");
-        }
+        });
+
+        toast.promise(promise, {
+            loading: "Menyimpan...",
+            success: (message) => message,
+            error: (err) => err.message,
+        });
     };
 
     const openModal = (skill = null) => {
@@ -161,33 +167,63 @@ export default function SkillsPage() {
         setModalCategories([]);
     };
 
-    const handleDelete = async (id) => {
-        if (confirm("Apakah Anda yakin ingin menghapus skill ini?")) {
-            try {
-                const res = await fetch(`/api/skills/${id}`, {
-                    method: "DELETE",
-                    headers: {
-                        "X-secret-code": process.env.NEXT_PUBLIC_API_SECRET_KEY,
-                    },
-                });
-                if (res.ok) {
-                    if (skills.length === 1 && currentPage > 1) {
-                        setCurrentPage(currentPage - 1);
-                    } else {
-                        fetchSkills(
-                            currentPage,
-                            debouncedSearchQuery,
-                            selectedCategory
-                        );
-                    }
-                } else {
-                    const result = await res.json();
-                    alert(`Error: ${result.error}`);
-                }
-            } catch (error) {
-                alert("Terjadi kesalahan saat menghapus.");
+    const handleDelete = (id) => {
+        toast(
+            (t) => (
+                <span>
+                    Apakah Anda yakin ingin menghapus skill ini?
+                    <button
+                        onClick={() => {
+                            toast.dismiss(t.id);
+                            deleteSkill(id);
+                        }}
+                        className="ml-2 px-3 py-1 rounded-md text-white bg-red-600 hover:bg-red-700"
+                    >
+                        Hapus
+                    </button>
+                    <button
+                        onClick={() => toast.dismiss(t.id)}
+                        className="ml-2 px-3 py-1 rounded-md text-gray-800 bg-gray-200 hover:bg-gray-300"
+                    >
+                        Batal
+                    </button>
+                </span>
+            ),
+            {
+                duration: 5000,
             }
-        }
+        );
+    };
+
+    const deleteSkill = async (id) => {
+        const promise = fetch(`/api/skills/${id}`, {
+            method: "DELETE",
+            headers: {
+                "X-secret-code": process.env.NEXT_PUBLIC_API_SECRET_KEY,
+            },
+        }).then(async (res) => {
+            if (res.ok) {
+                if (skills.length === 1 && currentPage > 1) {
+                    setCurrentPage(currentPage - 1);
+                } else {
+                    fetchSkills(
+                        currentPage,
+                        debouncedSearchQuery,
+                        selectedCategory
+                    );
+                }
+                return "Skill berhasil dihapus.";
+            } else {
+                const result = await res.json();
+                throw new Error(result.error || "Terjadi kesalahan.");
+            }
+        });
+
+        toast.promise(promise, {
+            loading: "Menghapus...",
+            success: (message) => message,
+            error: (err) => err.message,
+        });
     };
 
     const firstItemNumber =
@@ -199,6 +235,7 @@ export default function SkillsPage() {
 
     return (
         <div className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8 py-6">
+            <Toaster position="top-right" reverseOrder={false} />
             <div className="flex flex-col md:flex-row justify-between items-center mb-6 gap-4">
                 <h1 className="text-3xl md:text-4xl font-semibold tracking-tight text-gray-900 dark:text-white">
                     Manage Skills

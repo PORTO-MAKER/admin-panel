@@ -7,8 +7,9 @@ import { CopyConditions } from "minio";
 
 export async function GET(request, { params }) {
     await dbConnect();
+    const { id } = await params;
     try {
-        const skill = await Skill.findById(params.id);
+        const skill = await Skill.findById(id);
         if (!skill) {
             return NextResponse.json(
                 { success: false, error: "Skill not found" },
@@ -17,7 +18,7 @@ export async function GET(request, { params }) {
         }
         return NextResponse.json({ success: true, data: skill });
     } catch (error) {
-        console.error(`GET /api/skills/${params.id} Error:`, error);
+        console.error(`GET /api/skills/${id} Error:`, error);
         return NextResponse.json(
             { success: false, error: error.message },
             { status: 400 }
@@ -27,6 +28,7 @@ export async function GET(request, { params }) {
 
 export async function PUT(request, { params }) {
     await dbConnect();
+    const { id } = await params;
     const formData = await request.formData();
     const name = formData.get("name");
     const lightImage = formData.get("lightImage");
@@ -38,7 +40,7 @@ export async function PUT(request, { params }) {
     const newDarkImageName = `${transformedName}-dark.svg`;
 
     try {
-        const skill = await Skill.findById(params.id);
+        const skill = await Skill.findById(id);
         if (!skill) {
             return NextResponse.json(
                 { success: false, error: "Skill not found" },
@@ -46,7 +48,7 @@ export async function PUT(request, { params }) {
             );
         }
 
-        const oldCategory = await SkillCategory.findOne({ skills: params.id });
+        const oldCategory = await SkillCategory.findOne({ skills: id });
 
         let finalLightPath = skill.lightColorPath;
         let finalDarkPath = skill.darkColorPath;
@@ -119,27 +121,27 @@ export async function PUT(request, { params }) {
         };
 
         const updatedSkill = await Skill.findByIdAndUpdate(
-            params.id,
+            id,
             updatedSkillData,
             { new: true }
         );
 
         if (oldCategory && oldCategory._id.toString() !== categoryId) {
             await SkillCategory.findByIdAndUpdate(oldCategory._id, {
-                $pull: { skills: params.id },
+                $pull: { skills: id },
             });
             await SkillCategory.findByIdAndUpdate(categoryId, {
-                $push: { skills: params.id },
+                $push: { skills: id },
             });
         } else if (!oldCategory && categoryId) {
             await SkillCategory.findByIdAndUpdate(categoryId, {
-                $push: { skills: params.id },
+                $push: { skills: id },
             });
         }
 
         return NextResponse.json({ success: true, data: updatedSkill });
     } catch (error) {
-        console.error(`PUT /api/skills/${params.id} Error:`, error);
+        console.error(`PUT /api/skills/${id} Error:`, error);
         if (error.code === 11000) {
             return NextResponse.json(
                 {
@@ -161,8 +163,9 @@ export async function PUT(request, { params }) {
 
 export async function DELETE(request, { params }) {
     await dbConnect();
+    const { id } = await params;
     try {
-        const skill = await Skill.findById(params.id);
+        const skill = await Skill.findById(id);
         if (!skill) {
             return NextResponse.json(
                 { success: false, error: "Skill not found" },
@@ -180,15 +183,15 @@ export async function DELETE(request, { params }) {
         );
 
         await SkillCategory.updateMany(
-            { skills: params.id },
-            { $pull: { skills: params.id } }
+            { skills: id },
+            { $pull: { skills: id } }
         );
 
-        await Skill.deleteOne({ _id: params.id });
+        await Skill.deleteOne({ _id: id });
 
         return NextResponse.json({ success: true, data: {} });
     } catch (error) {
-        console.error(`DELETE /api/skills/${params.id} Error:`, error);
+        console.error(`DELETE /api/skills/${id} Error:`, error);
         return NextResponse.json(
             { success: false, error: error.message },
             { status: 400 }
